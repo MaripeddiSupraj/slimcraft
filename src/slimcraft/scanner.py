@@ -1,6 +1,54 @@
 import os
+import subprocess
+import json
 from dockerfile_parse import DockerfileParser
 from slimcraft.docker_utils import get_image_size
+
+def run_trivy(image_name):
+    """Run Trivy on the given image and return CVE summary."""
+    try:
+        result = subprocess.run([
+            "trivy", "image", "--quiet", "--format", "json", image_name
+        ], capture_output=True, text=True, check=True)
+        data = json.loads(result.stdout)
+        cve_count = 0
+        critical_count = 0
+        for r in data.get("Results", []):
+            for vuln in r.get("Vulnerabilities", []):
+                cve_count += 1
+                if vuln.get("Severity") == "CRITICAL":
+                    critical_count += 1
+        return {"cve_count": cve_count, "critical_count": critical_count}
+    except Exception as e:
+        return {"error": f"Trivy scan failed: {e}"}
+
+def run_syft(image_name):
+    """Run Syft to generate SBOM and return package count."""
+    try:
+        result = subprocess.run([
+            "syft", image_name, "-o", "json"
+        ], capture_output=True, text=True, check=True)
+        data = json.loads(result.stdout)
+        pkgs = data.get("artifacts", [])
+        return {"package_count": len(pkgs)}
+    except Exception as e:
+        return {"error": f"Syft scan failed: {e}"}
+
+def detect_secrets(content):
+    """Detect common secrets in Dockerfile content."""
+    import re
+    patterns = [
+        r'(?i)AWS_ACCESS_KEY_ID',
+        r'(?i)AWS_SECRET_ACCESS_KEY',
+        r'(?i)GOOGLE_APPLICATION_CREDENTIALS',
+        r'(?i)password\s*=\s*.+',
+        r'(?i)secret\s*=\s*.+',
+        r'(?i)token\s*=\s*.+',
+    ]
+    for pat in patterns:
+        if re.search(pat, content):
+            return True
+    return False
 
 def analyze_dockerfile(file_path: str) -> dict:
     """
@@ -81,8 +129,47 @@ def analyze_dockerfile(file_path: str) -> dict:
             size = get_image_size(parser.baseimage)
             if size:
                 results["size_mb"] = size
+            # Trivy and Syft integration
+            trivy = run_trivy(parser.baseimage)
+            if "error" not in trivy:
+                results["cve_count"] = trivy["cve_count"]
+                results["critical_cves"] = trivy["critical_count"]
+            else:
+                results["cve_count"] = None
+                results["critical_cves"] = None
+                results["warnings"].append({
+                    "severity": "Low",
+                    "issue": "Trivy scan failed",
+                    "recommendation": trivy["error"]
+                })
+            syft = run_syft(parser.baseimage)
+            if "error" not in syft:
+                results["package_count"] = syft["package_count"]
+            else:
+                results["package_count"] = None
+                results["warnings"].append({
+                    "severity": "Low",
+                    "issue": "Syft scan failed",
+                    "recommendation": syft["error"]
+                })
     except Exception as e:
         # Docker not running or image not found locally without pull
         pass
+
+    # .dockerignore check
+    dockerignore_path = os.path.join(os.path.dirname(file_path), ".dockerignore")
+    if not os.path.exists(dockerignore_path):
+        results["warnings"].append({
+            "severity": "Medium",
+            "issue": ".dockerignore file missing.",
+            "recommendation": "Add a .dockerignore to avoid leaking build context and secrets."
+        })
+    # Secrets detection
+    if detect_secrets(content):
+        results["warnings"].append({
+            "severity": "Critical",
+            "issue": "Potential secret detected in Dockerfile.",
+            "recommendation": "Remove secrets from Dockerfile and use build-time ARGs or secrets management."
+        })
 
     return results
