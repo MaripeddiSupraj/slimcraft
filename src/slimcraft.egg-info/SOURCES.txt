@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/slimcraft/__init__.py
+src/slimcraft/cli.py
+src/slimcraft/docker_utils.py
+src/slimcraft/scanner.py
+src/slimcraft.egg-info/PKG-INFO
+src/slimcraft.egg-info/SOURCES.txt
+src/slimcraft.egg-info/dependency_links.txt
+src/slimcraft.egg-info/entry_points.txt
+src/slimcraft.egg-info/requires.txt
+src/slimcraft.egg-info/top_level.txt
