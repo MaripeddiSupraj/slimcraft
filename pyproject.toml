@@ -20,3 +20,9 @@ slimcraft = "slimcraft.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "flake8"
+]
