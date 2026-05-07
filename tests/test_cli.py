@@ -77,3 +77,23 @@ def test_harden_rewrite_and_pr(sample_dockerfile_bloated):
     )
     assert result.exit_code == 0
     assert "LLM rewrite not available" in result.output
+
+
+def test_harden_with_model_flag(sample_dockerfile_bloated):
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "harden", sample_dockerfile_bloated,
+            "--rewrite", "--model", "local:qwen2.5-coder",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "LLM rewrite not available" in result.output
+
+
+def test_harden_help_shows_model():
+    runner = CliRunner()
+    result = runner.invoke(main, ["harden", "--help"])
+    assert result.exit_code == 0
+    assert "--model" in result.output

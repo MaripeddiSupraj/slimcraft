@@ -97,9 +97,17 @@ def scan(dockerfile_path):
     '--rewrite', is_flag=True, help="Use LLM to rewrite the Dockerfile"
 )
 @click.option(
+    '--model', default=None,
+    help=(
+        'Model to use for rewrite. '
+        '"anthropic:default" or "local:qwen2.5-coder". '
+        'Defaults to ANTHROPIC_API_KEY or SLIMCRAFT_MODEL env var.'
+    ),
+)
+@click.option(
     '--pr', is_flag=True, help="Open a Pull Request with the rewrite"
 )
-def harden(dockerfile_path, rewrite, pr):
+def harden(dockerfile_path, rewrite, model, pr):
     """Harden a Dockerfile using agentic rewriting."""
     try:
         path = dockerfile_path
@@ -108,7 +116,10 @@ def harden(dockerfile_path, rewrite, pr):
             msg = "--rewrite flag not set. Only deterministic scan available."
             console.print(f"[yellow]{msg}[/yellow]")
             return
-        rewritten, rationale = llm_rewrite_dockerfile(path)
+        with console.status("Calling LLM..."):
+            rewritten, rationale = llm_rewrite_dockerfile(
+                path, model=model
+            )
         if rewritten:
             console.print("[green]🤖 Dockerfile rewritten![/green]")
             console.print("[bold]Rationale:[/bold] " + rationale)
