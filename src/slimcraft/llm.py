@@ -74,13 +74,16 @@ def _call_anthropic(api_key, model, system, messages):
 
     client = anthropic.Anthropic(api_key=api_key)
 
-    response = client.messages.create(
-        model=model,
-        max_tokens=4096,
-        temperature=0,
-        system=system,
-        messages=messages,
-    )
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=4096,
+            temperature=0,
+            system=system,
+            messages=messages,
+        )
+    except Exception as e:
+        return None, f"Anthropic API error: {e}"
 
     text = "".join(
         block.text for block in response.content if block.type == "text"
