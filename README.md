@@ -110,6 +110,17 @@ All config via environment variables or `.env` file:
 
 slimcraft loads `.env` from the current directory and `~/.slimcraft/.env`.
 
+## 🔗 Pre-commit Hook
+
+Add to your `.pre-commit-config.yaml`:
+
+```yaml
+- repo: https://github.com/MaripeddiSupraj/slimcraft
+  rev: v0.1.0
+  hooks:
+    - id: slimcraft-scan
+```
+
 ## 🧪 Running Tests
 
 ```bash

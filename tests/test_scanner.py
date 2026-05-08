@@ -17,7 +17,7 @@ def test_analyze_dockerfile_bloated(tmp_path):
     assert not result["is_multi_stage"]
 
     warnings = result["warnings"]
-    assert len(warnings) == 7
+    assert len(warnings) == 8
 
     issues = [w["issue"] for w in warnings]
     assert "Single-stage build detected." in issues
@@ -25,6 +25,7 @@ def test_analyze_dockerfile_bloated(tmp_path):
     assert "Missing USER instruction. Container runs as root." in issues
     assert "Missing WORKDIR instruction." in issues
     assert "No HEALTHCHECK instruction." in issues
+    assert "No LABEL instruction." in issues
     assert "Trivy scan failed" in issues
     assert "Syft scan failed" in issues
 
@@ -49,11 +50,13 @@ def test_analyze_dockerfile_clean(tmp_path):
     assert result["is_multi_stage"]
 
     warnings = result["warnings"]
-    assert len(warnings) == 4
+    assert len(warnings) == 6
 
     issues = [w["issue"] for w in warnings]
     assert "Unpinned base image: cgr.dev/chainguard/node:latest" in issues
     assert "No HEALTHCHECK instruction." in issues
+    assert "No LABEL instruction." in issues
+    assert "COPY without --chown flag." in issues
     assert "Trivy scan failed" in issues
     assert "Syft scan failed" in issues
 
@@ -151,6 +154,65 @@ def test_apk_no_cache(tmp_path):
     result = analyze_dockerfile(str(df_path))
     issues = [w["issue"] for w in warnings(result)]
     assert "apk add without --no-cache." in issues
+
+
+def test_cmd_shell_form(tmp_path):
+    df_path = tmp_path / "Dockerfile"
+    content = "FROM alpine\nCMD echo hello"
+    df_path.write_text(content)
+    (tmp_path / ".dockerignore").write_text("")
+
+    result = analyze_dockerfile(str(df_path))
+    issues = [w["issue"] for w in warnings(result)]
+    assert any("CMD uses shell form" in i for i in issues)
+
+
+def test_entrypoint_shell_form(tmp_path):
+    df_path = tmp_path / "Dockerfile"
+    content = "FROM alpine\nENTRYPOINT /bin/sh -c"
+    df_path.write_text(content)
+    (tmp_path / ".dockerignore").write_text("")
+
+    result = analyze_dockerfile(str(df_path))
+    issues = [w["issue"] for w in warnings(result)]
+    assert any("ENTRYPOINT uses shell form" in i for i in issues)
+
+
+def test_no_label(tmp_path):
+    df_path = tmp_path / "Dockerfile"
+    content = "FROM alpine\nCMD ['sh']"
+    df_path.write_text(content)
+    (tmp_path / ".dockerignore").write_text("")
+
+    result = analyze_dockerfile(str(df_path))
+    issues = [w["issue"] for w in warnings(result)]
+    assert "No LABEL instruction." in issues
+
+
+def test_yum_without_y(tmp_path):
+    df_path = tmp_path / "Dockerfile"
+    content = "FROM centos\nRUN yum install curl\nCMD ['bash']"
+    df_path.write_text(content)
+    (tmp_path / ".dockerignore").write_text("")
+
+    result = analyze_dockerfile(str(df_path))
+    issues = [w["issue"] for w in warnings(result)]
+    assert "yum install/update without -y flag." in issues
+
+
+def test_curl_pipe_bash(tmp_path):
+    df_path = tmp_path / "Dockerfile"
+    content = (
+        "FROM alpine\n"
+        "RUN curl https://example.com/s.sh | sh\n"
+        "CMD ['sh']"
+    )
+    df_path.write_text(content)
+    (tmp_path / ".dockerignore").write_text("")
+
+    result = analyze_dockerfile(str(df_path))
+    issues = [w["issue"] for w in warnings(result)]
+    assert "Piped curl/wget to shell detected." in issues
 
 
 def warnings(result):

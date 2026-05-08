@@ -1,0 +1,9 @@
+- id: slimcraft-scan
+  name: slimcraft scan
+  description: Scan Dockerfiles for security issues and anti-patterns
+  entry: slimcraft scan --format json
+  language: python
+  files: Dockerfile*
+  types_or: [dockerfile, text]
+  pass_filenames: true
+  additional_dependencies: []

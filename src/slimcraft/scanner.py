@@ -239,6 +239,67 @@ def analyze_dockerfile(file_path: str) -> dict:
               "Add a HEALTHCHECK for container orchestration "
               "to detect unhealthy states.")
 
+    # 16. CMD/ENTRYPOINT string form (should use exec form)
+    for instr in ['CMD', 'ENTRYPOINT']:
+        for inst in _find_instructions(structure, instr):
+            val = (inst.get('value') or '').strip()
+            if val and not val.startswith('[') and not val.startswith('"'):
+                _warn(results, "Medium",
+                      f"{instr} uses shell form instead of exec form.",
+                      f"Use exec form: `{instr} [\"executable\", \"arg\"]`")
+                break
+
+    # 17. Multiple ENV vars on single line
+    env_instructions = _find_instructions(structure, 'ENV')
+    for env in env_instructions:
+        val = (env.get('value') or '').strip()
+        if ' ' in val and '=' in val:
+            parts = val.split()
+            eq_count = sum(1 for p in parts if '=' in p)
+            if eq_count > 1:
+                _warn(results, "Low",
+                      "Multiple ENV vars defined on a single line.",
+                      "Use one ENV per line for better layer caching.")
+                break
+
+    # 18. No LABEL
+    if not _find_instructions(structure, 'LABEL'):
+        _warn(results, "Low",
+              "No LABEL instruction.",
+              "Add LABEL for metadata (maintainer, version, description).")
+
+    # 19. yum/zypper/dnf without -y
+    for pkg_mgr in ['yum', 'zypper', 'dnf']:
+        ptn = rf'{pkg_mgr}\s+(install|update)(?!.*-y)'
+        if _any_run_matches(run_instructions, ptn):
+            _warn(results, "Medium",
+                  f"{pkg_mgr} install/update without -y flag.",
+                  f"Add `-y` to {pkg_mgr} to avoid interactive prompts.")
+            break
+
+    # 20. curl | bash or wget | sh
+    pipe_shell = r'(curl|wget)\s+.*\s*\|\s*(bash|sh)'
+    if _any_run_matches(run_instructions, pipe_shell):
+        _warn(results, "Critical",
+              "Piped curl/wget to shell detected.",
+              "Download and verify the script separately "
+              "instead of piping to shell.")
+
+    # 21. COPY without --chown when non-root USER exists
+    if user_instructions:
+        last_user = user_instructions[-1]['value'].strip()
+        if last_user != 'root':
+            copy_instructions = _find_instructions(structure, 'COPY')
+            for cp in copy_instructions:
+                if '--from=' in (cp.get('value') or ''):
+                    continue
+                if '--chown=' not in (cp.get('value') or ''):
+                    _warn(results, "Medium",
+                          "COPY without --chown flag.",
+                          f"Add `--chown={last_user}` "
+                          "to maintain correct file ownership.")
+                    break
+
     # Image size via Docker daemon
     if parser.baseimage:
         size = get_image_size(parser.baseimage)
