@@ -1,3 +1,4 @@
+import json
 from click.testing import CliRunner
 from slimcraft.cli import main
 
@@ -32,16 +33,42 @@ def test_scan_missing_file():
     runner = CliRunner()
     result = runner.invoke(main, ["scan", "does_not_exist"])
     assert result.exit_code != 0
-    assert "does not exist" in result.output
 
 
-def test_scan_success(mock_subprocess, mock_docker, sample_dockerfile_bloated):
+def test_scan_finds_warnings(
+    mock_subprocess, mock_docker, sample_dockerfile_bloated
+):
+    """Scan exits non-zero when warnings are found."""
     runner = CliRunner()
     result = runner.invoke(main, ["scan", sample_dockerfile_bloated])
-    assert result.exit_code == 0
+    assert result.exit_code != 0
     assert "Scan complete" in result.output
-    assert "Single-stage" in result.output
     assert "node:18" in result.output
+
+
+def test_scan_json_output(
+    mock_subprocess, mock_docker, sample_dockerfile_bloated
+):
+    runner = CliRunner()
+    result = runner.invoke(
+        main, ["scan", sample_dockerfile_bloated, "--format", "json"]
+    )
+    data = json.loads(result.output)
+    assert "warnings" in data
+    assert data["base_image"] == "node:18"
+    assert len(data["warnings"]) > 0
+
+
+def test_scan_format_help():
+    runner = CliRunner()
+    result = runner.invoke(main, ["scan", "--help"])
+    assert "--format" in result.output
+
+
+def test_scan_build_help():
+    runner = CliRunner()
+    result = runner.invoke(main, ["scan", "--help"])
+    assert "--build" in result.output
 
 
 def test_harden_no_rewrite(sample_dockerfile_bloated):
