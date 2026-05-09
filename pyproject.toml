@@ -26,3 +26,6 @@ dev = [
     "pytest",
     "flake8"
 ]
+llm = [
+    "anthropic>=0.49.0"
+]
