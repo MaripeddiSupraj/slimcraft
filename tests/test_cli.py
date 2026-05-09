@@ -124,3 +124,65 @@ def test_harden_help_shows_model():
     result = runner.invoke(main, ["harden", "--help"])
     assert result.exit_code == 0
     assert "--model" in result.output
+
+
+def test_fix_help():
+    runner = CliRunner()
+    result = runner.invoke(main, ["fix", "--help"])
+    assert result.exit_code == 0
+    assert "Apply deterministic fixes" in result.output
+
+
+def test_fix_no_fixes_needed(tmp_path):
+    runner = CliRunner()
+    df = tmp_path / "Dockerfile"
+    df.write_text(
+        "FROM ubuntu:22.04\n"
+        "WORKDIR /app\n"
+        "RUN apt-get update && apt-get install -y curl\n"
+        "USER appuser\n"
+        "CMD [\"bash\"]\n"
+    )
+    # Pre-create .dockerignore so it's not reported as a fix
+    (tmp_path / ".dockerignore").write_text("node_modules/\n")
+    result = runner.invoke(main, ["fix", str(df)])
+    assert result.exit_code == 0
+    assert "No fixes needed" in result.output
+
+
+def test_fix_applies_fixes_and_prints(tmp_path):
+    runner = CliRunner()
+    df = tmp_path / "Dockerfile"
+    df.write_text(
+        "FROM ubuntu:22.04\n"
+        "RUN apt-get install curl\n"
+        "CMD [\"bash\"]\n"
+    )
+    result = runner.invoke(main, ["fix", str(df)])
+    assert result.exit_code == 0
+    assert "apt-y" in result.output
+    assert "user" in result.output
+    assert "workdir" in result.output
+    assert "apt-get install -y" in result.output
+    assert "USER nonroot" in result.output
+    assert "WORKDIR /app" in result.output
+
+
+def test_fix_writes_in_place(tmp_path):
+    runner = CliRunner()
+    df = tmp_path / "Dockerfile"
+    original = "FROM ubuntu:22.04\nRUN pip install requests\nCMD [\"bash\"]\n"
+    df.write_text(original)
+    result = runner.invoke(main, ["fix", str(df), "--write"])
+    assert result.exit_code == 0
+    assert "Written to" in result.output
+    fixed = df.read_text()
+    assert "pip install --no-cache-dir" in fixed
+    assert "USER nonroot" in fixed
+    assert "WORKDIR /app" in fixed
+
+
+def test_fix_missing_file():
+    runner = CliRunner()
+    result = runner.invoke(main, ["fix", "does_not_exist"])
+    assert result.exit_code != 0

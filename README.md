@@ -97,6 +97,16 @@ slimcraft harden path/to/Dockerfile --rewrite --model local:qwen2.5-coder
 slimcraft harden path/to/Dockerfile --rewrite --pr
 ```
 
+**5. Apply deterministic fixes (no LLM needed)**
+```bash
+# Print fixed version to stdout
+slimcraft fix path/to/Dockerfile
+
+# Write fixes back to the file in-place
+slimcraft fix path/to/Dockerfile --write
+```
+Fixes applied: `-y` to apt-get/yum/dnf/zypper, `--no-cache-dir` to pip, `--no-cache` to apk, missing `WORKDIR /app`, missing `USER nonroot`, missing `.dockerignore`.
+
 ## ⚙️ Configuration
 
 All config via environment variables or `.env` file:

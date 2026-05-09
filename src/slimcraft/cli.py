@@ -9,6 +9,7 @@ from slimcraft.llm import llm_rewrite_dockerfile
 from slimcraft.pr_utils import open_pr_with_diff
 from slimcraft.docker_utils import build_image
 from slimcraft.config import load_env
+from slimcraft.fixer import fix_dockerfile, fix_dockerignore
 
 console = Console()
 
@@ -185,6 +186,59 @@ def harden(dockerfile_path, rewrite, model, pr):
             console.print(msg)
     except Exception as e:
         logger.exception("Exception during harden: %s", e)
+        console.print(f"[bold red]Unexpected error: {e}[/bold red]")
+        raise SystemExit(1)
+
+
+@main.command()
+@click.argument(
+    'dockerfile_path', type=click.Path(exists=True, dir_okay=False)
+)
+@click.option(
+    '--write', is_flag=True,
+    help="Write fixes back to the file (default: print to stdout)"
+)
+def fix(dockerfile_path, write):
+    """Apply deterministic fixes to a Dockerfile (no LLM needed)."""
+    try:
+        path = dockerfile_path
+        console.print(f"[bold blue]Fixing {path}...[/bold blue]")
+
+        with open(path) as f:
+            original = f.read()
+
+        fixed, changes = fix_dockerfile(original)
+
+        di_created = fix_dockerignore(path)
+
+        if not changes and not di_created:
+            console.print(
+                "[green]No fixes needed. Dockerfile is clean![/green]"
+            )
+            return
+
+        if changes:
+            console.print(f"[green]Made {len(changes)} fix(es):[/green]")
+            for c in changes:
+                console.print(
+                    f"  [cyan]{c['id']}[/cyan] — {c['description']} "
+                    f"({c['count']} occurrence{'s' if c['count'] > 1 else ''})"
+                )
+
+        if di_created:
+            console.print(
+                "  [cyan]dockerignore[/cyan] — Created .dockerignore file"
+            )
+
+        if write:
+            with open(path, 'w') as f:
+                f.write(fixed)
+            console.print(f"[green]Written to {path}[/green]")
+        else:
+            console.print("\n[bold]--- Fixed Dockerfile ---[/bold]")
+            click.echo(fixed)
+    except Exception as e:
+        logger.exception("Exception during fix: %s", e)
         console.print(f"[bold red]Unexpected error: {e}[/bold red]")
         raise SystemExit(1)
 
