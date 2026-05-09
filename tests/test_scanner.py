@@ -83,7 +83,7 @@ def test_apt_without_y(tmp_path):
 
     result = analyze_dockerfile(str(df_path))
     issues = [w["issue"] for w in warnings(result)]
-    assert "apt-get without -y flag." in issues
+    assert "apt-get install without -y flag." in issues
 
 
 def test_split_apt_update_install(tmp_path):
@@ -213,6 +213,41 @@ def test_curl_pipe_bash(tmp_path):
     result = analyze_dockerfile(str(df_path))
     issues = [w["issue"] for w in warnings(result)]
     assert "Piped curl/wget to shell detected." in issues
+
+
+def test_copy_without_chown_unconditional(tmp_path):
+    """COPY without --chown should warn even without a USER instruction."""
+    df_path = tmp_path / "Dockerfile"
+    content = (
+        "FROM alpine:3.20\n"
+        "COPY . /app\n"
+        "CMD [\"sh\"]"
+    )
+    df_path.write_text(content)
+    (tmp_path / ".dockerignore").write_text("")
+
+    result = analyze_dockerfile(str(df_path))
+    issues = [w["issue"] for w in warnings(result)]
+    assert "COPY without --chown flag." in issues
+
+
+def test_apt_get_update_not_false_positive(tmp_path):
+    """apt-get update (without install) should not trigger -y warning."""
+    df_path = tmp_path / "Dockerfile"
+    content = (
+        "FROM ubuntu:22.04\n"
+        "RUN apt-get update\n"
+        "CMD [\"bash\"]"
+    )
+    df_path.write_text(content)
+    (tmp_path / ".dockerignore").write_text("")
+
+    result = analyze_dockerfile(str(df_path))
+    apt_issues = [
+        w for w in warnings(result)
+        if "apt-get" in w["issue"].lower()
+    ]
+    assert len(apt_issues) == 0
 
 
 def warnings(result):

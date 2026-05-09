@@ -1,6 +1,8 @@
 import subprocess
 import os
 import time
+import tempfile
+import shutil
 import logging
 
 logger = logging.getLogger("slimcraft")
@@ -85,8 +87,15 @@ def open_pr_with_diff(original_path, rewritten_content, rationale):
 
     try:
         _run(["git", "checkout", "-b", branch])
-        with open(original_path, 'w') as f:
-            f.write(rewritten_content)
+        # Write to temp file first, then atomically replace
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(original_path))
+        try:
+            with os.fdopen(fd, 'w') as f:
+                f.write(rewritten_content)
+            shutil.move(tmp, original_path)
+        except Exception:
+            os.unlink(tmp)
+            raise
         _run(["git", "add", original_path])
         _run(["git", "commit", "-m", title])
         _run(["git", "push", "-u", "origin", branch])

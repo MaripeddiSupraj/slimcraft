@@ -198,11 +198,14 @@ def harden(dockerfile_path, rewrite, model, pr):
     '--write', is_flag=True,
     help="Write fixes back to the file (default: print to stdout)"
 )
-def fix(dockerfile_path, write):
+@click.option(
+    '--check', 'check_only', is_flag=True,
+    help="Exit non-zero if any fixes would be applied (no output)"
+)
+def fix(dockerfile_path, write, check_only):
     """Apply deterministic fixes to a Dockerfile (no LLM needed)."""
     try:
         path = dockerfile_path
-        console.print(f"[bold blue]Fixing {path}...[/bold blue]")
 
         with open(path) as f:
             original = f.read()
@@ -211,7 +214,14 @@ def fix(dockerfile_path, write):
 
         di_created = fix_dockerignore(path)
 
-        if not changes and not di_created:
+        has_changes = bool(changes) or di_created
+
+        if check_only:
+            raise SystemExit(1 if has_changes else 0)
+
+        console.print(f"[bold blue]Fixing {path}...[/bold blue]")
+
+        if not has_changes:
             console.print(
                 "[green]No fixes needed. Dockerfile is clean![/green]"
             )

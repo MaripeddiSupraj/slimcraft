@@ -1,5 +1,3 @@
-FROM node:18
-WORKDIR /app
-COPY . .
-RUN npm install
-CMD ["npm", "start"]
+FROM ubuntu:22.04
+RUN apt-get update
+CMD ["bash"]

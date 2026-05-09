@@ -4,12 +4,19 @@ import pytest
 
 @pytest.fixture
 def mock_subprocess():
-    """Mock subprocess.run to return empty trivy/syft results."""
+    """Mock subprocess.run for trivy (Results) and syft (artifacts)."""
+
+    def _side_effect(cmd, *args, **kwargs):
+        if cmd[0] == 'trivy':
+            stdout = '{"Results": []}'
+        elif cmd[0] == 'syft':
+            stdout = '{"artifacts": []}'
+        else:
+            stdout = ""
+        return MagicMock(stdout=stdout, returncode=0)
+
     with patch("slimcraft.scanner.subprocess.run") as mock:
-        mock.return_value = MagicMock(
-            stdout='{"Results": []}',
-            returncode=0,
-        )
+        mock.side_effect = _side_effect
         yield mock
 
 

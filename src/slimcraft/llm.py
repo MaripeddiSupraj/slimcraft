@@ -1,7 +1,9 @@
 import os
 import re
 import logging
+import tempfile
 
+from dockerfile_parse import DockerfileParser
 from slimcraft.config import getenv
 
 logger = logging.getLogger("slimcraft")
@@ -38,6 +40,28 @@ def _build_user_message(content):
         "Here is the Dockerfile to rewrite:\n\n"
         f"```dockerfile\n{content}\n```"
     )
+
+
+def _validate_dockerfile(content):
+    """Quick syntax check — raises if content has no valid instructions."""
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.Dockerfile', delete=False
+    ) as f:
+        f.write(content)
+        tmp = f.name
+    try:
+        parser = DockerfileParser(path=tmp)
+        structure = parser.structure
+        if not structure or all(
+            inst['instruction'] == 'COMMENT' for inst in structure
+        ):
+            raise ValueError("LLM returned syntactically invalid Dockerfile")
+    except ValueError:
+        raise
+    except Exception:
+        raise ValueError("LLM returned syntactically invalid Dockerfile")
+    finally:
+        os.unlink(tmp)
 
 
 def _parse_llm_response(text):
@@ -169,6 +193,12 @@ def llm_rewrite_dockerfile(dockerfile_path, model=None):
     if parse_err:
         logger.debug("Raw LLM response: %s", text[:500])
         return None, parse_err
+
+    try:
+        _validate_dockerfile(rewritten)
+    except ValueError as e:
+        logger.debug("Invalid LLM output: %s", rewritten[:500])
+        return None, str(e)
 
     logger.info(
         "LLM rewrite complete (%d chars -> %d chars)",

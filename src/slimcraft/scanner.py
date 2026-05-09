@@ -150,11 +150,11 @@ def analyze_dockerfile(file_path: str) -> dict:
                   "URL fetching or tar auto-extraction.")
             break
 
-    # 6. apt-get without -y
-    if _any_run_matches(run_instructions, r'apt-get (?!.*-y)'):
+    # 6. apt-get install without -y
+    if _any_run_matches(run_instructions, r'apt-get\s+install\s+(?!.*-y)'):
         _warn(results, "Medium",
-              "apt-get without -y flag.",
-              "Add `-y` to apt-get to avoid interactive prompts.")
+              "apt-get install without -y flag.",
+              "Add `-y` to apt-get install to avoid interactive prompts.")
 
     # 7. Split apt-get update / install
     run_vals = [inst['value'] for inst in run_instructions]
@@ -285,20 +285,22 @@ def analyze_dockerfile(file_path: str) -> dict:
               "Download and verify the script separately "
               "instead of piping to shell.")
 
-    # 21. COPY without --chown when non-root USER exists
-    if user_instructions:
-        last_user = user_instructions[-1]['value'].strip()
-        if last_user != 'root':
-            copy_instructions = _find_instructions(structure, 'COPY')
-            for cp in copy_instructions:
-                if '--from=' in (cp.get('value') or ''):
-                    continue
-                if '--chown=' not in (cp.get('value') or ''):
-                    _warn(results, "Medium",
-                          "COPY without --chown flag.",
-                          f"Add `--chown={last_user}` "
-                          "to maintain correct file ownership.")
-                    break
+    # 21. COPY without --chown
+    copy_instructions = _find_instructions(structure, 'COPY')
+    for cp in copy_instructions:
+        if '--from=' in (cp.get('value') or ''):
+            continue
+        if '--chown=' not in (cp.get('value') or ''):
+            target_user = "root"
+            if user_instructions:
+                last = user_instructions[-1]['value'].strip()
+                if last != 'root':
+                    target_user = last
+            _warn(results, "Medium",
+                  "COPY without --chown flag.",
+                  f"Add `--chown={target_user}` "
+                  "to maintain correct file ownership.")
+            break
 
     # Image size via Docker daemon
     if parser.baseimage:

@@ -9,6 +9,7 @@ def get_image_size(image_name: str) -> float | None:
         try:
             image = client.images.get(image_name)
         except docker.errors.ImageNotFound:
+            print(f"Pulling image: {image_name}...")
             image = client.images.pull(image_name)
         size_mb = image.attrs.get('Size', 0) / (1024 * 1024)
         return size_mb

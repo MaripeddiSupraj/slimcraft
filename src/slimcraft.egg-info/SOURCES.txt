@@ -2,7 +2,11 @@ README.md
 pyproject.toml
 src/slimcraft/__init__.py
 src/slimcraft/cli.py
+src/slimcraft/config.py
 src/slimcraft/docker_utils.py
+src/slimcraft/fixer.py
+src/slimcraft/llm.py
+src/slimcraft/pr_utils.py
 src/slimcraft/scanner.py
 src/slimcraft.egg-info/PKG-INFO
 src/slimcraft.egg-info/SOURCES.txt
@@ -10,3 +14,9 @@ src/slimcraft.egg-info/dependency_links.txt
 src/slimcraft.egg-info/entry_points.txt
 src/slimcraft.egg-info/requires.txt
 src/slimcraft.egg-info/top_level.txt
+tests/test_cli.py
+tests/test_config.py
+tests/test_fixer.py
+tests/test_llm.py
+tests/test_pr_utils.py
+tests/test_scanner.py

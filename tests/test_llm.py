@@ -4,6 +4,7 @@ from slimcraft.llm import (
     llm_rewrite_dockerfile,
     _parse_llm_response,
     _build_user_message,
+    _validate_dockerfile,
 )
 
 
@@ -172,3 +173,35 @@ def test_ollama_success(tmp_path):
     assert rewritten is not None
     assert "FROM node:18-slim" in rewritten
     assert "multi-stage" in rationale.lower()
+
+
+def test_llm_invalid_output_rejected(tmp_path):
+    df = tmp_path / "Dockerfile"
+    df.write_text("FROM node:18")
+
+    invalid = """```dockerfile
+    # just a comment — no valid instructions
+    ```
+    ## Rationale
+    Garbage"""
+
+    with (
+        patch("slimcraft.llm.getenv", return_value="sk-fake"),
+        patch(
+            "slimcraft.llm._call_anthropic",
+            return_value=(invalid, None),
+        ),
+    ):
+        rewritten, err = llm_rewrite_dockerfile(str(df))
+        assert rewritten is None
+        assert "invalid dockerfile" in err.lower()
+
+
+def test_validate_dockerfile_valid():
+    _validate_dockerfile("FROM alpine:3.20\nCMD [\"sh\"]\n")
+
+
+def test_validate_dockerfile_empty():
+    import pytest
+    with pytest.raises(ValueError, match="invalid Dockerfile"):
+        _validate_dockerfile("")

@@ -186,3 +186,28 @@ def test_fix_missing_file():
     runner = CliRunner()
     result = runner.invoke(main, ["fix", "does_not_exist"])
     assert result.exit_code != 0
+
+
+def test_fix_check_exits_nonzero_when_fixes_needed(tmp_path):
+    runner = CliRunner()
+    df = tmp_path / "Dockerfile"
+    df.write_text(
+        "FROM ubuntu:22.04\nRUN pip install requests\nCMD [\"bash\"]\n"
+    )
+    result = runner.invoke(main, ["fix", str(df), "--check"])
+    assert result.exit_code == 1
+
+
+def test_fix_check_exits_zero_when_clean(tmp_path):
+    runner = CliRunner()
+    df = tmp_path / "Dockerfile"
+    df.write_text(
+        "FROM ubuntu:22.04\n"
+        "WORKDIR /app\n"
+        "RUN pip install --no-cache-dir requests\n"
+        "USER nonroot\n"
+        "CMD [\"bash\"]\n"
+    )
+    (tmp_path / ".dockerignore").write_text("node_modules/\n")
+    result = runner.invoke(main, ["fix", str(df), "--check"])
+    assert result.exit_code == 0
