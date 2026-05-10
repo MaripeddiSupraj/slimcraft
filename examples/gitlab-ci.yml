@@ -1,0 +1,42 @@
+# slimcraft — GitLab CI template
+# Add this job to your .gitlab-ci.yml to scan Dockerfiles on every commit.
+
+slimcraft-scan:
+  image: python:3.11-slim
+  stage: test
+  before_script:
+    - pip install slimcraft
+  script:
+    - slimcraft scan Dockerfile --format json
+  artifacts:
+    when: always
+    reports:
+      metrics: slimcraft-report.json
+    paths:
+      - slimcraft-report.json
+  variables:
+    SLIMCRAFT_FAIL_ON: "medium"  # exit non-zero for Medium+ severity
+  allow_failure: true
+
+# Variant: Fail the pipeline on High+ severity issues
+slimcraft-scan-strict:
+  image: python:3.11-slim
+  stage: test
+  before_script:
+    - pip install slimcraft
+  script:
+    - slimcraft scan Dockerfile --format json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  allow_failure: false
+
+# Variant: Deterministic fix in CI (check mode)
+slimcraft-fix-check:
+  image: python:3.11-slim
+  stage: test
+  before_script:
+    - pip install slimcraft
+  script:
+    - slimcraft fix Dockerfile --check
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'

@@ -243,6 +243,15 @@ Options:
   continue-on-error: true
 ```
 
+### GitLab CI
+
+```yaml
+include:
+  - remote: https://raw.githubusercontent.com/MaripeddiSupraj/slimcraft/main/examples/gitlab-ci.yml
+```
+
+Or copy the job from [`examples/gitlab-ci.yml`](examples/gitlab-ci.yml) directly into your `.gitlab-ci.yml`.
+
 ### Pre-commit
 
 ```yaml
